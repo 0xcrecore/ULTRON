@@ -1,0 +1,4 @@
+// Safe generic HTTPS/API helper. Use only explicit user-requested URLs.
+const https=require('https');
+async function httpsRequest(url,opts={}){const u=new URL(url);if(u.protocol!=='https:')throw new Error('HTTPS required');const body=opts.body==null?null:JSON.stringify(opts.body);return new Promise((resolve,reject)=>{const req=https.request({hostname:u.hostname,path:u.pathname+u.search,method:opts.method||'GET',headers:{...(body?{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}:{}),...(opts.headers||{})},timeout:opts.timeout||15000},res=>{let s='';res.on('data',c=>s+=c);res.on('end',()=>{let d=s;try{d=JSON.parse(s)}catch{}resolve({status:res.statusCode,data:d})})});req.on('error',reject);req.on('timeout',()=>{req.destroy();reject(new Error('HTTPS timeout'))});if(body)req.write(body);req.end()})}
+module.exports={httpsRequest};
