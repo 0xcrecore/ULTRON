@@ -85,7 +85,7 @@ WORKDIR /app
 COPY handler.py .
 COPY health_shim.py .
 COPY entrypoint.sh .
-COPY AGENT_PROMPT.md .
+COPY JARVIS_PROMPT.md ./AGENT_PROMPT.md
 RUN chmod +x entrypoint.sh
 
 # ── Runtime environment defaults ───────────────────────────────────────────────
