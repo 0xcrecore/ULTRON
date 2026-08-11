@@ -1,7 +1,4 @@
 model/
-Dockerfile
-JARVIS_PROMPT.md
-upload_model_to_s3.sh
 test_aws.sh
 upload_s3.log
 docker_build.log
