@@ -563,6 +563,34 @@ async def run_agent(user_message: str, session_id: str, job_id: str,
 
 # ── RunPod Handler ─────────────────────────────────────────────────────────────
 
+def _coerce_message(raw):
+    """Normalize a user chat message into a plain string (handles str, list, dict)."""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = []
+        for item in raw:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                content = item.get("content")
+                if isinstance(content, str):
+                    parts.append(content)
+                elif isinstance(content, list):
+                    for segment in content:
+                        if isinstance(segment, str):
+                            parts.append(segment)
+                        elif isinstance(segment, dict) and isinstance(segment.get("text"), str):
+                            parts.append(segment["text"])
+        return "\n".join(parts) if parts else str(raw)
+    if isinstance(raw, dict):
+        content = raw.get("content")
+        if content is not None:
+            return _coerce_message(content)
+        return str(raw)
+    return str(raw)
+
+
 async def handler(job: dict) -> dict:
     """
     RunPod serverless entry point (async — RunPod SDK supports async handlers).
@@ -593,12 +621,12 @@ async def handler(job: dict) -> dict:
             user_message = ""
             for msg in reversed(messages_list):
                 if msg.get("role") == "user":
-                    user_message = msg["content"]
+                    user_message = _coerce_message(msg["content"])
                     break
             if not user_message:
                 user_message = str(payload)
         elif "message" in job_input:
-            user_message = job_input["message"]
+            user_message = _coerce_message(job_input["message"])
         else:
             return {"error": "No 'message' or 'payload' found in job input"}
 
