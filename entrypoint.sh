@@ -90,8 +90,11 @@ log "Handler started (PID: ${HANDLER_PID})"
 sleep 3
 
 # ── STEP 2: Download model if not cached ──────────────────────────────────────
-# Remove stale ready-file in case a previous run left it but the model is gone
-[ ! -f "$MODEL_FILE" ] && rm -f "$MODEL_READY_FILE"
+# ALWAYS remove the stale ready-file at startup. The Network Volume persists
+# across workers, so a .model_ready left by a previous run would make the
+# handler skip its warming_up check and hit llama-server with a 503 before the
+# model is actually loaded into VRAM.
+rm -f "$MODEL_READY_FILE"
 
 if [ -f "$MODEL_FILE" ]; then
     FILE_SIZE=$(du -sh "$MODEL_FILE" | cut -f1)
