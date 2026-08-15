@@ -140,7 +140,7 @@ llama-server \
     --n-gpu-layers "$N_GPU_LAYERS" \
     --ctx-size "$CONTEXT_SIZE" \
     --parallel "$N_PARALLEL" \
-    --flash-attn \
+    --flash-attn auto \
     --mlock \
     --no-mmap \
     --batch-size "$BATCH_SIZE" \
