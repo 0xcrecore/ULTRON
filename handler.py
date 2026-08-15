@@ -541,6 +541,37 @@ def strip_tool_calls(text: str) -> str:
     """Remove all tool call blocks from text."""
     return _TOOL_PATTERN.sub("", text).strip()
 
+# ── Refusal Guard ─────────────────────────────────────────────────────────────
+# Qwen2.5-Coder models have a strong prior to answer "I have no filesystem
+# access — run this command and paste the output". That's wrong here: ULTRON
+# HAS PC access via code_bridge. Detect such refusals and force a retry.
+
+_REFUSAL_PATTERNS = [
+    r"kein(?:en)?\s+(?:direkten\s+)?zugriff",
+    r"kein(?:en)?\s+zugriff\s+auf",
+    r"no\s+(?:direct\s+)?(?:filesystem\s+)?access",
+    r"do\s+not\s+have\s+access",
+    r"i\s+(?:do\s+)?not\s+have\s+(?:direct\s+)?access",
+    r"hier\s+einf[üu]gen",
+    r"terminal\s+ausf[üu]hren",
+    r"run\s+(?:this|the\s+following)\s+command",
+    r"paste\s+the\s+output",
+    r"f[üu]gen\s+sie\s+die\s+ausgabe",
+    r"als\s+ki-assistent",
+    r"as\s+an\s+ai\s+(?:assistant|language\s+model)",
+]
+
+REFUSAL_CORRECTION = (
+    "STOPP. Das ist falsch: Du hast Zugriff auf den PC über das Tool code_bridge. "
+    "Antworte NICHT, dass du keinen Zugriff hast, und fordere den Nutzer NICHT auf, "
+    "selbst einen Befehl auszuführen. Rufe JETZT code_bridge auf, um die Aufgabe "
+    "wirklich auszuführen, und danach bridge_result."
+)
+
+def _is_refusal(text: str) -> bool:
+    t = text.lower()
+    return any(re.search(p, t) for p in _REFUSAL_PATTERNS)
+
 # ── Agentic Loop ──────────────────────────────────────────────────────────────
 
 async def run_agent(user_message: str, session_id: str, job_id: str,
@@ -577,6 +608,17 @@ async def run_agent(user_message: str, session_id: str, job_id: str,
         calls = extract_tool_calls(assistant_reply)
 
         if not calls:
+            # Refusal guard: if the model claims "no filesystem access" but the
+            # user asked for a file/code action, force it to use code_bridge.
+            if tool_iterations < 2 and _is_refusal(assistant_reply):
+                logger.info(f"[{job_id}] Refusal detected — injecting corrective prompt")
+                messages.append({"role": "assistant", "content": assistant_reply})
+                messages.append({"role": "user", "content": REFUSAL_CORRECTION})
+                new_messages.append({"role": "assistant", "content": assistant_reply})
+                new_messages.append({"role": "user", "content": REFUSAL_CORRECTION})
+                tool_iterations += 1
+                continue
+
             # No tool calls — this is the final answer
             final_response = strip_tool_calls(assistant_reply)
             messages.append({"role": "assistant", "content": assistant_reply})
