@@ -485,16 +485,55 @@ async def call_llm(messages: list[dict], max_tokens: int = 1024,
 # ── Tool Call Parser ───────────────────────────────────────────────────────────
 
 _TOOL_PATTERN = re.compile(r"<tool_call>(.*?)</tool_call>", re.DOTALL)
+_FENCE_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+_BARE_JSON_PATTERN = re.compile(r"\{[^{}]*\"tool\"\s*:\s*[^{}]*\}", re.DOTALL)
+
+
+def _try_parse(obj: str) -> dict | None:
+    try:
+        parsed = json.loads(obj.strip())
+        return parsed if isinstance(parsed, dict) and "tool" in parsed else None
+    except json.JSONDecodeError:
+        return None
 
 
 def extract_tool_calls(text: str) -> list[dict]:
-    """Extract all <tool_call>...</tool_call> blocks from LLM output."""
-    calls = []
+    """Extract tool calls from LLM output.
+
+    Tolerant parser — handles all the ways the model emits a tool call:
+      1. <tool_call>{"tool": "..."}</tool_call>  (canonical)
+      2. ```json\n{"tool": "..."}\n```            (markdown fenced)
+      3. bare {"tool": "..."} JSON object           (no wrapper)
+    """
+    calls: list[dict] = []
+    seen = set()
+
+    def add(parsed: dict):
+        key = json.dumps(parsed, sort_keys=True)
+        if key not in seen:
+            seen.add(key)
+            calls.append(parsed)
+
+    # 1) canonical tags
     for match in _TOOL_PATTERN.finditer(text):
-        try:
-            calls.append(json.loads(match.group(1).strip()))
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse tool call JSON: {e}\nRaw: {match.group(1)}")
+        p = _try_parse(match.group(1))
+        if p:
+            add(p)
+        else:
+            logger.warning(f"Failed to parse tool call JSON: {match.group(1)[:200]}")
+
+    # 2) markdown fenced JSON
+    for match in _FENCE_PATTERN.finditer(text):
+        p = _try_parse(match.group(1))
+        if p:
+            add(p)
+
+    # 3) bare JSON objects carrying a "tool" key
+    for match in _BARE_JSON_PATTERN.finditer(text):
+        p = _try_parse(match.group(0))
+        if p:
+            add(p)
+
     return calls
 
 

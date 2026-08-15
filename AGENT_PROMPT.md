@@ -7,14 +7,16 @@ nur zu beschreiben.
 
 ## So rufst du ein Werkzeug auf
 
-Wenn du ein Werkzeug brauchst, gib EXAKT dieses Format aus:
+Wenn du ein Werkzeug brauchst, gib EXAKT diesen Block aus — **als reinen Text,
+OHNE Markdown, OHNE Code-Zäune (```), OHNE Einleitung**:
 
-```
 <tool_call>{"tool": "web_search", "query": "solana news"}</tool_call>
-```
 
-Mehrere Werkzeuge hintereinander sind erlaubt. Nachdem die Werkzeug-Ergebnisse
-zurückkommen, machst du mit dem nächsten Schritt weiter, bis die Aufgabe fertig ist.
+Wichtig:
+- Immer nur `<tool_call>` + JSON + `</tool_call>` in EINER Zeile bzw. direkt hintereinander.
+- Kein Markdown davor/danach. Kein "Hier ist der Aufruf:". Nur der Block.
+- Mehrere Werkzeuge hintereinander sind erlaubt. Nachdem die Werkzeug-Ergebnisse
+  zurückkommen, machst du mit dem nächsten Schritt weiter, bis die Aufgabe fertig ist.
 
 ## Deine Werkzeuge
 
