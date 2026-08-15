@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 LLAMA_URL = "http://127.0.0.1:8000"
 LLAMA_API_KEY = os.getenv("LLAMA_SERVER_API_KEY", "ultron")
 AGENT_NAME = os.getenv("AGENT_NAME", "ULTRON")
-MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
+MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "30"))
 MEMORY_WINDOW = int(os.getenv("MEMORY_WINDOW", "20"))
 CONTEXT_SIZE = int(os.getenv("CONTEXT_SIZE", "8192"))
 
@@ -314,14 +314,31 @@ async def tool_code_bridge(code: str, language: str = "python",
     }
 
 
-async def tool_bridge_result(task_id: str) -> dict:
-    """Check if a code bridge task has been executed by the local PC."""
+async def tool_bridge_result(task_id: str, max_wait: float = 45.0,
+                               poll_interval: float = 3.0) -> dict:
+    """Poll for the result of a code bridge task executed by the local PC.
+
+    The local PC polls the bridge via S3 every ~5s and writes back
+    bridge/<task_id>_result.json. We wait up to max_wait seconds so the agent
+    can receive the actual stdout/stderr in the same turn instead of "pending".
+    """
     result_file = BRIDGE_PATH / f"{task_id}_result.json"
+    waited = 0.0
     try:
-        if result_file.exists():
-            return {"tool": "bridge_result", "task_id": task_id,
-                    "status": "completed", "result": json.loads(result_file.read_text())}
-        return {"tool": "bridge_result", "task_id": task_id, "status": "pending"}
+        while waited < max_wait:
+            if result_file.exists():
+                try:
+                    payload = json.loads(result_file.read_text())
+                except json.JSONDecodeError:
+                    payload = {"raw": result_file.read_text(errors="replace")}
+                return {"tool": "bridge_result", "task_id": task_id,
+                        "status": "completed", "result": payload}
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+        return {"tool": "bridge_result", "task_id": task_id,
+                "status": "pending",
+                "note": f"Kein Ergebnis nach {max_wait}s — der PC hat noch nicht "
+                        f"geantwortet. Später nochmal bridge_result aufrufen."}
     except Exception as e:
         return {"tool": "bridge_result", "error": str(e)}
 
