@@ -97,7 +97,7 @@ if [ -f "$MODEL_FILE" ]; then
     FILE_SIZE=$(du -sh "$MODEL_FILE" | cut -f1)
     log "Model already cached: ${MODEL_FILE} (${FILE_SIZE}) — skipping download"
 else
-    log "Downloading model (~20 GB). Jobs will receive 'warming_up' until done."
+    log "Downloading model (~9 GB). Jobs will receive 'warming_up' until done."
     log "  Repo: ${MODEL_REPO}  File: ${MODEL_FILENAME}"
 
     python3 - <<PYEOF

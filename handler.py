@@ -646,7 +646,7 @@ async def handler(job: dict) -> dict:
             downloaded_gb = round(model_file.stat().st_size / 1e9, 1) if model_file.exists() else 0
             return {
                 "status": "warming_up",
-                "message": f"⏳ Modell wird heruntergeladen... {downloaded_gb} GB / ~20 GB",
+                "message": f"⏳ Modell wird heruntergeladen... {downloaded_gb} GB / ~9 GB",
                 "agent": AGENT_NAME,
             }
 
@@ -660,10 +660,10 @@ async def handler(job: dict) -> dict:
             return {
                 "status": "warming_up",
                 "message": (
-                    f"⏳ ULTRON startet kalt. Modell wird geladen ({downloaded_gb} GB / ~20 GB).\n"
+                    f"⏳ ULTRON startet kalt. Modell wird geladen ({downloaded_gb} GB / ~9 GB).\n"
                     "Bitte in 1–2 Minuten erneut versuchen."
                     if downloaded_gb > 0 else
-                    "⏳ ULTRON startet kalt. Modell-Download beginnt gleich (~20 GB, ~15 Min).\n"
+                    "⏳ ULTRON startet kalt. Modell-Download beginnt gleich (~9 GB, ~10 Min).\n"
                     "Bitte später erneut versuchen oder /wake verwenden."
                 ),
                 "retry_after_seconds": 60,

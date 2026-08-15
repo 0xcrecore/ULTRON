@@ -69,9 +69,14 @@ RUN set -e && \
     wget -q --show-progress -O /tmp/llama.tar.gz "${URL}" && \
     mkdir -p /tmp/llama && \
     tar -xzf /tmp/llama.tar.gz -C /tmp/llama && \
-    # Binary lives at cuda-<ver>/llama-server inside the tarball
-    find /tmp/llama -name "llama-server" -type f | head -1 \
-        | xargs -I{} install -m 755 {} /usr/local/bin/llama-server && \
+    # The tarball ships the binary AND its shared libs (libggml-*.so, libllama*.so)
+    # in one cuda-<ver> dir. Copy ALL of it, not just the binary, or llama-server
+    # dies at runtime with "libllama-server-impl.so: cannot open shared object file".
+    LLAMA_DIR="$(find /tmp/llama -mindepth 1 -maxdepth 1 -type d -name 'cuda-*' | head -1)" && \
+    install -m 755 "${LLAMA_DIR}/llama-server" /usr/local/bin/llama-server && \
+    cp -a "${LLAMA_DIR}"/lib*.so* /usr/local/lib/ && \
+    echo "/usr/local/lib" > /etc/ld.so.conf.d/llama-cpp.conf && \
+    ldconfig && \
     rm -rf /tmp/llama /tmp/llama.tar.gz && \
     echo "llama-server installed: $(llama-server --version 2>&1 | head -1)"
 
