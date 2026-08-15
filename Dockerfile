@@ -43,6 +43,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-distutils \
     # Runtime CUDA libs the prebuilt llama-server needs
     libcublas-12-4 \
+    # OpenMP runtime — libggml-cuda/cpu/base.so all link libgomp.so.1
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python 3.11 as default ─────────────────────────────────────────────────────
@@ -78,7 +80,11 @@ RUN set -e && \
     echo "/usr/local/lib" > /etc/ld.so.conf.d/llama-cpp.conf && \
     ldconfig && \
     rm -rf /tmp/llama /tmp/llama.tar.gz && \
-    echo "llama-server installed: $(llama-server --version 2>&1 | head -1)"
+    echo "llama-server installed: $(llama-server --version 2>&1 | head -1)" && \
+    echo "Verifying shared libs (libcuda.so.1 is provided by GPU host at runtime)..." && \
+    MISSING="$(ldd /usr/local/bin/llama-server | grep 'not found' | grep -v 'libcuda.so.1' || true)" && \
+    if [ -n "$MISSING" ]; then echo "BUILD FAIL: missing libs:"; echo "$MISSING"; exit 1; fi && \
+    echo "All shared libs resolved."
 
 # ── Python dependencies ────────────────────────────────────────────────────────
 COPY requirements.txt /tmp/requirements.txt
